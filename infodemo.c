@@ -28,21 +28,21 @@ void getAndPrintUserName(uid_t uid) {
 }
 
 
-int main() {
+// int main() {
 
-  struct group *grp;
+//   struct group *grp;
 
-  getAndPrintGroup(1001);
-  getAndPrintGroup(514378);
-  getAndPrintGroup(103);
-  getAndPrintGroup(1000);
+//   getAndPrintGroup(1001);
+//   getAndPrintGroup(514378);
+//   getAndPrintGroup(103);
+//   getAndPrintGroup(1000);
   
-  getAndPrintUserName(59894);
-  getAndPrintUserName(23524);
-  getAndPrintUserName(20746);
-  getAndPrintUserName(5970);
-  getAndPrintUserName(10485);
+//   getAndPrintUserName(59894);
+//   getAndPrintUserName(23524);
+//   getAndPrintUserName(20746);
+//   getAndPrintUserName(5970);
+//   getAndPrintUserName(10485);
 
-	return 0;
+// 	return 0;
 
-}
+// }
