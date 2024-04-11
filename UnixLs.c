@@ -30,56 +30,72 @@ void getAndPrintUserName(uid_t uid) {
     }
 }
 
-void printFileDetails(const char *pathName, int printInode) {
-    struct stat pathStats;
-    if (lstat(pathName, &pathStats) == -1) {
+void printFileDetails(const char *fileName, const char *filePath, int printInode) {
+    struct stat fileStat;
+    if (lstat(filePath, &fileStat) == -1) {
         perror("Error");
         return;
     }
 
     // Print inode number if requested
     if (printInode) {
-        printf("%lu ", (unsigned long)pathStats.st_ino);
+        printf("%lu ", (unsigned long)fileStat.st_ino);
     }
 
     // File permissions
-    printf((S_ISDIR(pathStats.st_mode)) ? "d" : "-");
-    printf((pathStats.st_mode & S_IRUSR) ? "r" : "-");
-    printf((pathStats.st_mode & S_IWUSR) ? "w" : "-");
-    printf((pathStats.st_mode & S_IXUSR) ? "x" : "-");
-    printf((pathStats.st_mode & S_IRGRP) ? "r" : "-");
-    printf((pathStats.st_mode & S_IWGRP) ? "w" : "-");
-    printf((pathStats.st_mode & S_IXGRP) ? "x" : "-");
-    printf((pathStats.st_mode & S_IROTH) ? "r" : "-");
-    printf((pathStats.st_mode & S_IWOTH) ? "w" : "-");
-    printf((pathStats.st_mode & S_IXOTH) ? "x " : "- ");
+    printf((S_ISDIR(fileStat.st_mode)) ? "d" : "-");
+    printf((fileStat.st_mode & S_IRUSR) ? "r" : "-");
+    printf((fileStat.st_mode & S_IWUSR) ? "w" : "-");
+    printf((fileStat.st_mode & S_IXUSR) ? "x" : "-");
+    printf((fileStat.st_mode & S_IRGRP) ? "r" : "-");
+    printf((fileStat.st_mode & S_IWGRP) ? "w" : "-");
+    printf((fileStat.st_mode & S_IXGRP) ? "x" : "-");
+    printf((fileStat.st_mode & S_IROTH) ? "r" : "-");
+    printf((fileStat.st_mode & S_IWOTH) ? "w" : "-");
+    printf((fileStat.st_mode & S_IXOTH) ? "x " : "- ");
 
     // Number of hard links
-    printf("%ld ", (long)pathStats.st_nlink);
+    printf("%ld ", (long)fileStat.st_nlink);
 
     // Owner's username and group name
-    getAndPrintUserName(pathStats.st_uid);
-    getAndPrintGroup(pathStats.st_gid);
+    getAndPrintUserName(fileStat.st_uid);
+    getAndPrintGroup(fileStat.st_gid);
 
     // File size
-    printf("%ld ", (long)pathStats.st_size);
+    printf("%ld ", (long)fileStat.st_size);
 
     // Last modified time
-    struct tm *tm_info = localtime(&pathStats.st_mtime);
-    char recentTime[20];
-    strftime(recentTime, sizeof(recentTime), "%b %d %Y %H:%M" , tm_info);
-    printf("%s ", recentTime);
+    struct tm *tm_info = localtime(&fileStat.st_mtime);
+    char modTime[20];
+    strftime(modTime, sizeof(modTime), "%b %d %Y %H:%M", tm_info);
+    printf("%s ", modTime);
 
-    // File name
-    printf("%s\n", pathName);
+    // File path
+    printf("%s\n", fileName);
 }
 
+
 int main(int argc, char *argv[]) {
+    // Get the home directory path
+    const char *homeDir = getenv("HOME");
+    if (homeDir == NULL) {
+        struct passwd *pw = getpwuid(getuid());
+        if (pw != NULL) {
+            homeDir = pw->pw_dir;
+        } else {
+            perror("Error");
+            return 1;
+        }
+    }
+    //Need to figure out ??
+    // // Replace ~ symbol with home directory path
+    // if (argc > 1 && (argv[2][0] == '~')) {
+    //     printf("home\n");
+    //     argv[2] = (char *)homeDir;
+    // }
+
     int printInode = 0;
     int printDetails = 0;
-    char *dirName = NULL;
-
-    // Parse command-line arguments
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-i") == 0) {
             printInode = 1;
@@ -88,35 +104,38 @@ int main(int argc, char *argv[]) {
         } else if (strcmp(argv[i], "-il") == 0 || strcmp(argv[i], "-li") == 0) {
             printInode = 1;
             printDetails = 1;
-        } else if (strcmp(argv[i], "-l") == 0 && strcmp(argv[i+2], "-i") == 0) {
+        } else if (strcmp(argv[i], "-l") == 0 && strcmp(argv[i+1], "-i") == 0) {
             printInode = 1;
             printDetails = 1;
-        } else if (strcmp(argv[i], "-i") == 0 && strcmp(argv[i+2], "-l") == 0) {
+        } else if (strcmp(argv[i], "-i") == 0 && strcmp(argv[i+1], "-l") == 0) {
             printInode = 1;
             printDetails = 1;
         }
     }
 
     // Set directory name
-    if (argc == 1 || (argc == 2 && (printInode || printDetails))) {
-        dirName = ".";
-    } else {
-        dirName = argv[argc - 1];
+    char *dirName = ".";
+    if (argc > 1 && argv[1][0] != '-') {
+        dirName = argv[1];
     }
 
-    // Open the directory
-    DIR *dir;
-    struct dirent *entry;
-
-    if ((dir = opendir(dirName)) == NULL) {
+    // Open directory
+    DIR *dir = opendir(dirName);
+    if (dir == NULL) {
         perror("Error");
         return 1;
     }
 
-    // Iterate over directory entries
+    // Read directory entries
+    struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
-        // Skip current directory (.) and parent directory (..)
+        // Skip . and ..
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        // Skip ".git" directory
+        if (strcmp(entry->d_name, ".git") == 0) {
             continue;
         }
 
@@ -124,21 +143,25 @@ int main(int argc, char *argv[]) {
         snprintf(path, sizeof(path), "%s/%s", dirName, entry->d_name);
 
         if (printDetails) {
-            printFileDetails(path, printInode);
+            printFileDetails(entry->d_name, path, printInode);
         } else {
             if (printInode) {
-                struct stat pathStats;
-                if (stat(path, &pathStats) == -1) {
+                struct stat fileStat;
+                if (stat(path, &fileStat) == -1) {
                     perror("Error");
                     return 1;
                 }
-                printf("%lu %s\n", (unsigned long)pathStats.st_ino, entry->d_name);
+                printf("%lu %s\n", (unsigned long)fileStat.st_ino, entry->d_name);
             } else {
                 printf("%s\n", entry->d_name);
             }
         }
     }
 
+    // Close directory
     closedir(dir);
+
     return 0;
 }
+
+
